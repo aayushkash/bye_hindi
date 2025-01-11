@@ -179,4 +179,3 @@ if __name__ == "__main__":
         args.org
     )
 
-#python upload_to_hf.py --repo-name hindi-bpe-tokenizer --token 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

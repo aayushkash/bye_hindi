@@ -1,125 +1,136 @@
-import streamlit as st
-import plotly.express as px
-import plotly.graph_objects as go
-from collections import Counter
-import pandas as pd
+import gradio as gr
+from huggingface_hub import snapshot_download
 from hindi_bpe import HindiBPE, preprocess_hindi_text
-from data_loader import load_hindi_dataset
-from typing import List
+import pandas as pd
+import plotly.express as px
+import os
 
-class BPEVisualizer:
+# Download tokenizer if not exists
+if not os.path.exists("tokenizer"):
+    snapshot_download(
+        repo_id="aayushraina/bpe-hindi",
+        local_dir="tokenizer",
+        allow_patterns=["*.json"]
+    )
+
+class TokenizerDemo:
     def __init__(self):
-        self.bpe = None
+        self.tokenizer = HindiBPE.load_tokenizer("tokenizer")
         
-    def train_bpe(self, text: str, vocab_size: int):
-        """Train BPE model and store it."""
-        self.bpe = HindiBPE(vocab_size=vocab_size)
-        self.bpe.train(text)
+    def tokenize_text(self, text: str) -> tuple:
+        """Tokenize text and return visualization"""
+        if not text:
+            return "", None, "Please enter some text"
+            
+        # Preprocess
+        text = preprocess_hindi_text(text)
         
-    def visualize_token_distribution(self) -> go.Figure:
-        """Create token length distribution plot."""
-        token_lengths = [len(token) for token in self.bpe.vocab]
-        length_counts = Counter(token_lengths)
+        # Tokenize
+        tokens = self.tokenizer.encode(text)
         
-        df = pd.DataFrame({
-            'Length': list(length_counts.keys()),
-            'Count': list(length_counts.values())
+        # Create visualization
+        token_df = pd.DataFrame({
+            'Token': tokens,
+            'Length': [len(token) for token in tokens]
         })
         
-        fig = px.bar(df, x='Length', y='Count',
-                    title='Token Length Distribution')
-        return fig
-    
-    def visualize_compression_progress(self, text: str) -> go.Figure:
-        """Visualize compression ratio progress during encoding."""
-        encoded = self.bpe.encode(text)
-        original_chars = len(text)
-        encoded_chars = sum(len(token) for token in encoded)
+        fig = px.scatter(token_df, 
+                        x=range(len(tokens)), 
+                        y='Length',
+                        hover_data=['Token'],
+                        title='Token Lengths in Sequence')
         
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=['Original', 'Encoded'],
-            y=[original_chars, encoded_chars],
-            name='Character Count'
-        ))
+        # Calculate statistics
+        stats = {
+            'Total Tokens': len(tokens),
+            'Unique Tokens': len(set(tokens)),
+            'Average Token Length': sum(len(t) for t in tokens) / len(tokens),
+            'Compression Ratio': len(text) / sum(len(t) for t in tokens)
+        }
         
-        fig.update_layout(title='Text Compression Comparison')
-        return fig
+        stats_str = "\n".join(f"{k}: {v:.2f}" if isinstance(v, float) else f"{k}: {v}" 
+                             for k, v in stats.items())
+        
+        return (
+            " ".join(tokens),  # Tokenized text
+            fig,              # Visualization
+            stats_str        # Statistics
+        )
     
-    def tokenize_text(self, text: str) -> List[str]:
-        """Tokenize input text and return tokens."""
-        if self.bpe is None:
-            raise ValueError("BPE model not trained yet!")
-        return self.bpe.encode(text)
+    def decode_tokens(self, tokens_text: str) -> str:
+        """Decode space-separated tokens back to text"""
+        if not tokens_text:
+            return "Please tokenize some text first"
+        tokens = tokens_text.split()
+        return self.tokenizer.decode(tokens)
 
-def main():
-    st.title("Hindi BPE Tokenizer Visualization")
-    
-    # Sidebar controls
-    st.sidebar.header("Settings")
-    vocab_size = st.sidebar.slider("Vocabulary Size", 1000, 5000, 4500)
-    num_articles = st.sidebar.slider("Number of Articles", 100, 5000, 1000)
-    
-    # Initialize visualizer
-    visualizer = BPEVisualizer()
-    
-    # Load and train
-    if st.button("Train New Model"):
-        with st.spinner("Loading dataset..."):
-            try:
-                text = load_hindi_dataset(
-                    split="train",
-                    num_files=num_articles
-                )
-                text = preprocess_hindi_text(text)
-                
-                # Load some validation data
-                valid_text = load_hindi_dataset(
-                    split="valid",
-                    num_files=min(num_articles // 5, 100)
-                )
-                
-            except FileNotFoundError:
-                st.error("Dataset not found! Please check the data directory structure")
-                return
-        
-        with st.spinner("Training BPE..."):
-            visualizer.train_bpe(text, vocab_size)
-            
-        st.success("Training completed!")
-        
-        # Show visualizations
-        st.subheader("Token Length Distribution")
-        st.plotly_chart(visualizer.visualize_token_distribution())
-        
-        st.subheader("Compression Results")
-        st.plotly_chart(visualizer.visualize_compression_progress(text))
-    
-    # Interactive tokenization
-    st.header("Try Tokenization")
-    input_text = st.text_area("Enter Hindi text to tokenize:", height=150)
-    
-    if st.button("Tokenize") and visualizer.bpe is not None:
-        if input_text:
-            tokens = visualizer.tokenize_text(input_text)
-            
-            # Display tokens
-            st.subheader("Tokenization Result")
-            token_df = pd.DataFrame({
-                'Token': tokens,
-                'Length': [len(token) for token in tokens]
-            })
-            st.dataframe(token_df)
-            
-            # Show token visualization
-            fig = px.scatter(token_df, x=range(len(tokens)), y='Length',
-                           hover_data=['Token'],
-                           title='Token Lengths in Sequence')
-            st.plotly_chart(fig)
-        else:
-            st.warning("Please enter some text to tokenize")
-    elif visualizer.bpe is None:
-        st.warning("Please train the model first")
+# Create Gradio interface
+demo = TokenizerDemo()
 
-if __name__ == "__main__":
-    main() 
+interface = gr.Blocks(title="Hindi BPE Tokenizer")
+
+with interface:
+    gr.Markdown("""
+    # Hindi BPE Tokenizer Demo
+    
+    This demo showcases a Byte Pair Encoding (BPE) tokenizer specifically trained for Hindi text.
+    Enter Hindi text to see how it gets tokenized and analyze the token distribution.
+    
+    [View model on Hugging Face](https://huggingface.co/aayushraina/bpe-hindi)
+    """)
+    
+    with gr.Row():
+        with gr.Column():
+            input_text = gr.Textbox(
+                label="Input Hindi Text",
+                placeholder="हिंदी में टेक्स्ट दर्ज करें...",
+                lines=5
+            )
+            tokenize_btn = gr.Button("Tokenize")
+        
+        with gr.Column():
+            tokens_output = gr.Textbox(
+                label="Tokenized Output",
+                lines=5
+            )
+            decode_btn = gr.Button("Decode")
+            
+    original_output = gr.Textbox(
+        label="Decoded Text",
+        lines=5
+    )
+    
+    stats_output = gr.Textbox(
+        label="Tokenization Statistics",
+        lines=4
+    )
+    
+    plot_output = gr.Plot(
+        label="Token Length Distribution"
+    )
+    
+    # Set up event handlers
+    tokenize_btn.click(
+        fn=demo.tokenize_text,
+        inputs=input_text,
+        outputs=[tokens_output, plot_output, stats_output]
+    )
+    
+    decode_btn.click(
+        fn=demo.decode_tokens,
+        inputs=tokens_output,
+        outputs=original_output
+    )
+    
+    # Add examples
+    gr.Examples(
+        examples=[
+            ["हिंदी भाषा बहुत सुंदर है।"],
+            ["भारत एक विशाल देश है। यहाँ की संस्कृति बहुत पुरानी है।"],
+            ["मैं हिंदी में प्रोग्रामिंग सीख रहा हूं।"]
+        ],
+        inputs=input_text
+    )
+
+# Launch the interface
+interface.launch() 

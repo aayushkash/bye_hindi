@@ -175,7 +175,7 @@ class BytePairEncoder:
         
         print(f"Max token length: {self.max_token_length}")
 
-class GreedyBPE:
+class TokenizerInternal:
     """Tokenizer using trained BPE model"""
     def __init__(self, encoder: BytePairEncoder):
         self.stoi = encoder.stoi

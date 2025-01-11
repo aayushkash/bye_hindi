@@ -1,6 +1,32 @@
+---
+language: hi
+title: Hindi BPE Tokenizer
+description: A Hindi BPE tokenizer for efficient text compression and processing.
+emoji: 🌐
+color: blue
+pinned: true
+tags:
+- hindi
+- tokenizer
+- bpe
+- subword
+- text-processing
+pipeline_tag: text2text-generation
+inference: true
+license: mit
+app_file: app.py
+sdk: gradio
+spaces:
+- aayushraina/bpe-hindi
+---
+
 # Hindi Byte Pair Encoding (BPE) Tokenizer
 
 A specialized BPE tokenizer for Hindi text that achieves efficient compression while maintaining linguistic coherence.
+
+## Online Demo
+
+Try the tokenizer in your browser: [Hindi BPE Tokenizer Demo](https://huggingface.co/spaces/aayushraina/bpe-hindi)
 
 ## Project Overview
 
@@ -22,10 +48,15 @@ hindi-bpe/
 ├── output/ # Visualization outputs
 ├── byte_pair_encoder.py # Core BPE implementation
 ├── hindi_bpe.py # Hindi-specific wrapper
-├── app.py # Streamlit web interface
 ├── test_hindi_bpe.py # Test suite
 └── requirements.txt # Dependencies
 
+## Training stats
+    - Iteration 4500:
+    - Vocabulary size: 4,477
+    - Data size: 448,754
+    - Compression ratio: 3.66
+    - Max token length: 64
 
 ## File Descriptions
 

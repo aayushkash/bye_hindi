@@ -9,7 +9,7 @@ from tqdm import tqdm
 import json
 from matplotlib import pyplot as plt
 from pathlib import Path
-from byte_pair_encoder import BytePairEncoder
+from byte_pair_encoder import BytePairEncoder, TokenizerInternal
 
 class HindiBPE:
     def __init__(self, vocab_size: int = 5000):
@@ -41,7 +41,7 @@ class HindiBPE:
             raise ValueError("Tokenizer not trained yet!")
             
         print("\nTokenizing text...")
-        tokenizer = GreedyBPE(self.encoder)
+        tokenizer = TokenizerInternal(self.encoder)
         tokens = list(tokenizer.tokenize(text))
         
         compression = self.calculate_compression_ratio(text, tokens)
